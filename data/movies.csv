@@ -1,0 +1,11 @@
+movie_id,title,genres,tags,plot,rating_count,avg_rating
+1,The Galactic Voyage,Sci-Fi|Adventure,space;exploration;friendship,A crew of explorers travel through a newly discovered wormhole to find a new home for humanity.,1200,4.5
+2,Hidden Recipes,Drama|Food,cooking;family;tradition,A young chef returns home to save the family restaurant and discovers a book of forgotten recipes.,850,4.2
+3,Quantum Heist,Sci-Fi|Thriller,heist;quantum;time travel,A team of thieves uses quantum tech to pull off a heist across different timelines.,950,4.4
+4,City of Strings,Drama|Music,music;violin;competition,An aspiring violinist balances intense training with family expectations.,630,4.0
+5,Pixel Rangers,Animation|Adventure,video games;teamwork;quest,A group of kids are pulled into a retro video game world and must beat levels to return home.,710,4.1
+6,Ocean Echoes,Documentary|Nature,ocean;conservation;wildlife,Marine biologists document efforts to rebuild coral reefs.,540,4.3
+7,Midnight Detectives,Mystery|Crime,detective;noir;investigation,Partners investigate a string of nighttime robberies linked to an art collective.,780,4.0
+8,Hearts in Orbit,Romance|Sci-Fi,romance;space station;long distance,Two engineers fall in love while repairing a failing orbital habitat.,430,3.9
+9,Trailblazers,Adventure|Biography,mountain;female lead;perseverance,A true story of a climber who leads an all-women expedition to a remote peak.,510,4.2
+10,The Last Library,Fantasy|Mystery,books;magic;librarian,A librarian discovers a doorway to a world where stories come alive.,880,4.6
