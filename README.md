@@ -1,11 +1,11 @@
 # LangGraph LLM Recommender Demo
 
 A minimal, torch-free recommendation flow built on [LangGraph](https://github.com/langchain-ai/langgraph).
-Multiple agents share a single LLM, use different prompts, pull tool outputs, and merge their views to produce movie suggestions.
+Multiple agents share a single LLM, use different prompts, pull tool outputs, and merge their views to produce content suggestions.
 
 ## Project layout
 
-- `data/movies.csv` &mdash; small public-style catalog used by the graph.
+- `data/ctr_samples.csv` &mdash; small CTR-style catalog with `label` (0/1), text description, tags, and categories.
 - `src/llmrec/graph.py` &mdash; LangGraph pipeline wiring multiple agents.
 - `src/llmrec/llm.py` &mdash; simple local LLM stub; swap with a real model if desired.
 - `run_demo.py` &mdash; example entry point.

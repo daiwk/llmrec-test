@@ -17,9 +17,9 @@ if __name__ == "__main__":
         format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
     )
     os.environ.setdefault("OPENAI_API_KEY", "")
-    os.environ.setdefault("OPENAI_BASE_URL", "http://127.0.0.1:11434/v1")
+    os.environ.setdefault("OPENAI_BASE_URL", "")
     os.environ.setdefault("LLMREC_MODEL", "qwen3:1.7b")
-    catalog_path = Path("data/movies.csv")
-    user_query = "我喜欢太空和冒险题材，但也想看到角色之间有情感联系"
+    catalog_path = Path("data/ctr_samples.csv")
+    user_query = "想看AI行业深度解读，最好有简明的要点和趋势分析"
     print("=== 正在运行推荐图谱 ===")
     print(run_recommendation(user_query=user_query, catalog_path=catalog_path))

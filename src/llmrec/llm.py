@@ -30,7 +30,7 @@ class LocalRecommenderLLM:
         logger.debug("本地LLM收到提示词，长度=%d，内容预览=%s", len(prompt), prompt[:120])
         if "可用代理" in prompt or "选择哪些代理" in prompt:
             return self._plan_route(prompt)
-        if "总结观影偏好" in prompt:
+        if "总结观影偏好" in prompt or "总结内容消费偏好" in prompt or "总结内容偏好" in prompt:
             return self._summarize_preferences(prompt)
         if "融合各代理信号" in prompt:
             return self._rank_recommendations(prompt)
@@ -47,10 +47,10 @@ class LocalRecommenderLLM:
         if self.canned_preferences:
             return self.canned_preferences
         match = re.search(r"用户需求：\s*(.+)", prompt)
-        request = match.group(1).strip() if match else "movies with strong themes"
+        request = match.group(1).strip() if match else "content with strong themes"
         return (
             "观众希望看到包含"
-            f"{request}的作品，倾向于沉浸式世界、情感张力和清晰的叙事动机。"
+            f"{request}的内容，倾向于沉浸式世界、情感张力和清晰的叙事动机。"
         )
 
     def _rank_recommendations(self, prompt: str) -> str:

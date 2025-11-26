@@ -1,0 +1,11 @@
+item_id,title,categories,tags,description,label
+1,AI Trends Weekly,Tech|AI,ai;newsletter;analysis,"A curated digest of emerging AI research, industry moves, and product launches tailored for tech-savvy readers.",1
+2,Budget Travel Hacks,Travel|Lifestyle,travel;budget;guide,"Practical itineraries and packing tips that help readers explore new cities while keeping costs low.",1
+3,Gourmet Plant Kitchen,Food|Lifestyle,vegan;recipe;healthy,"Step-by-step plant-based recipes with chef notes that keep flavor high and prep time manageable.",1
+4,Urban Fitness Minute,Health|Fitness,workout;city;quick,"Ten-minute routines designed for small apartments and busy schedules with video demos.",0
+5,Fantasy Saga Teaser,Entertainment|Video,fantasy;trailer;epic,"A cinematic teaser for an upcoming fantasy series highlighting worldbuilding and character intrigue.",1
+6,Finance Morning Brief,Finance|News,markets;newsletter;macro,"Daily email briefing covering market sentiment, earnings highlights, and macro signals for investors.",0
+7,Mindful Moments,Wellness|Audio,mindfulness;audio;relax,"Short audio sessions pairing breathing exercises with ambient soundscapes for stress relief.",0
+8,Indie Game Spotlight,Gaming|Indie,indie;gameplay;review,"Weekly spotlight on under-the-radar indie titles with narrative summaries and mechanic breakdowns.",1
+9,Home Office Deals,Shopping|Hardware,deals;hardware;office,"Roundup of discounted laptops, webcams, and ergonomic accessories for remote workers.",0
+10,Eco Living Essentials,Sustainability|Lifestyle,eco;habit;guide,"Actionable habits and product swaps that make it easier to reduce waste and energy use at home.",1
