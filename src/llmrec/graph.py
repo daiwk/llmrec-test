@@ -17,32 +17,30 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class Movie:
-    movie_id: int
+class CatalogItem:
+    item_id: int
     title: str
-    genres: List[str]
+    categories: List[str]
     tags: List[str]
-    plot: str
-    rating_count: int
-    avg_rating: float
+    description: str
+    label: int
 
     @classmethod
-    def from_row(cls, row: pd.Series) -> "Movie":
+    def from_row(cls, row: pd.Series) -> "CatalogItem":
         return cls(
-            movie_id=int(row["movie_id"]),
+            item_id=int(row["item_id"]),
             title=str(row["title"]),
-            genres=str(row["genres"]).split("|"),
+            categories=str(row["categories"]).split("|"),
             tags=str(row["tags"]).split(";"),
-            plot=str(row["plot"]),
-            rating_count=int(row["rating_count"]),
-            avg_rating=float(row["avg_rating"]),
+            description=str(row["description"]),
+            label=int(row["label"]),
         )
 
 
 class RecommendationState(TypedDict):
     user_query: str
     preferences_summary: str
-    candidate_pool: List[Movie]
+    candidate_pool: List[CatalogItem]
     snippets: List[str]
     recommendations: str
     pending_agents: List[str]
@@ -50,16 +48,16 @@ class RecommendationState(TypedDict):
     route_reason: str
 
 
-def load_catalog(path: str | Path) -> List[Movie]:
+def load_catalog(path: str | Path) -> List[CatalogItem]:
     df = pd.read_csv(path)
-    logger.debug("从%s加载影片库，共%d条", path, len(df))
-    return [Movie.from_row(row) for _, row in df.iterrows()]
+    logger.debug("从%s加载内容库，共%d条", path, len(df))
+    return [CatalogItem.from_row(row) for _, row in df.iterrows()]
 
 
 def preference_agent(llm: LocalRecommenderLLM) -> Callable[[RecommendationState], RecommendationState]:
     def _inner(state: RecommendationState) -> RecommendationState:
         prompt = (
-            "你是一名个性化策划专家，请根据用户诉求总结观影偏好。\n"
+            "你是一名个性化策划专家，请根据用户诉求总结内容消费偏好。\n"
             f"用户需求：{state['user_query']}\n"
             "请关注风格、题材、节奏和情绪意图，用两句话概括。"
         )
@@ -71,38 +69,38 @@ def preference_agent(llm: LocalRecommenderLLM) -> Callable[[RecommendationState]
     return _inner
 
 
-def _score_movie(movie: Movie, keywords: Iterable[str]) -> float:
-    score = movie.avg_rating + (movie.rating_count / 5000)
+def _score_item(item: CatalogItem, keywords: Iterable[str]) -> float:
+    score = 0.8 if item.label else 0.3
     lowered = {kw.lower() for kw in keywords}
-    for tag in movie.tags + movie.genres:
+    for tag in item.tags + item.categories:
         if tag.lower() in lowered:
             score += 0.6
-    for word in movie.plot.lower().split():
-        if word.strip(',.') in lowered:
+    for word in item.description.lower().split():
+        if word.strip(",.") in lowered:
             score += 0.05
     return score
 
 
-def retrieval_agent(catalog: List[Movie]) -> Callable[[RecommendationState], RecommendationState]:
+def retrieval_agent(catalog: List[CatalogItem]) -> Callable[[RecommendationState], RecommendationState]:
     def _inner(state: RecommendationState) -> RecommendationState:
         keywords = state["preferences_summary"].replace("|", " ").replace(";", " ").split()
         scored = [
-            (movie, _score_movie(movie, keywords))
-            for movie in catalog
+            (item, _score_item(item, keywords))
+            for item in catalog
         ]
         scored.sort(key=lambda item: item[1], reverse=True)
-        top_movies = [movie for movie, _ in scored[:6]]
-        logger.debug("召回阶段选出前%d部影片：%s", len(top_movies), [m.title for m in top_movies])
-        return {"candidate_pool": top_movies}
+        top_items = [item for item, _ in scored[:6]]
+        logger.debug("召回阶段选出前%d个内容：%s", len(top_items), [i.title for i in top_items])
+        return {"candidate_pool": top_items}
 
     return _inner
 
 
-def rag_agent(catalog: List[Movie]) -> Callable[[RecommendationState], RecommendationState]:
+def rag_agent(catalog: List[CatalogItem]) -> Callable[[RecommendationState], RecommendationState]:
     def _inner(state: RecommendationState) -> RecommendationState:
         snippets: List[str] = []
-        for movie in state["candidate_pool"][:3]:
-            snippet = f"{movie.title}: {movie.plot}"
+        for item in state["candidate_pool"][:3]:
+            snippet = f"{item.title}: {item.description}"
             snippets.append(snippet)
         logger.debug("提取到的上下文片段数量：%d", len(snippets))
         return {"snippets": snippets}
@@ -113,10 +111,13 @@ def rag_agent(catalog: List[Movie]) -> Callable[[RecommendationState], Recommend
 def ranking_agent(llm: LocalRecommenderLLM) -> Callable[[RecommendationState], RecommendationState]:
     def _inner(state: RecommendationState) -> RecommendationState:
         scored_candidates: List[str] = []
-        for movie in state["candidate_pool"]:
-            score = movie.avg_rating + movie.rating_count / 1000
+        for item in state["candidate_pool"]:
+            score = (1.5 if item.label else 0.5) + len(item.tags) * 0.1
             scored_candidates.append(
-                f"Title: {movie.title} | Score: {score:.2f} | Genres: {', '.join(movie.genres)} | Tags: {', '.join(movie.tags)}"
+                (
+                    f"Title: {item.title} | Score: {score:.2f} | Categories: {', '.join(item.categories)} "
+                    f"| Tags: {', '.join(item.tags)} | Label: {item.label}"
+                )
             )
 
         prompt = (
@@ -141,9 +142,9 @@ def planner_agent(llm: LocalRecommenderLLM) -> Callable[[RecommendationState], R
         prompt = (
             "你是调度员，需要根据用户诉求决定调用哪些代理。\n"
             "可用代理列表：\n"
-            "- preference_agent：总结观影偏好\n"
-            "- retrieval_agent：基于偏好召回影片\n"
-            "- rag_agent：抽取候选影片的剧情片段\n"
+            "- preference_agent：总结内容偏好\n"
+            "- retrieval_agent：基于偏好召回内容\n"
+            "- rag_agent：抽取候选的文案摘要\n"
             "- ranking_agent：融合信号生成推荐（必须最后执行）\n"
             "请输出执行顺序，使用逗号分隔的代理名称列表。如果无需上下文片段可以跳过 rag_agent。\n"
             f"用户诉求：{state['user_query']}\n"
@@ -220,7 +221,7 @@ def build_graph(catalog_path: str | Path, llm: LocalRecommenderLLM | None = None
     return workflow.compile()
 
 
-def run_recommendation(user_query: str, catalog_path: str | Path = "data/movies.csv") -> str:
+def run_recommendation(user_query: str, catalog_path: str | Path = "data/ctr_samples.csv") -> str:
     graph = build_graph(catalog_path)
     result = graph.invoke(
         {
