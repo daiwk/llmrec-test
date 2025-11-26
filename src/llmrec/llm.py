@@ -8,8 +8,6 @@ import os
 from dataclasses import dataclass
 from typing import Iterable, List
 
-from openai import OpenAI
-
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +28,8 @@ class LocalRecommenderLLM:
     def complete(self, prompt: str) -> str:
         """Return a lightweight, rule-based completion for the given prompt."""
         logger.debug("本地LLM收到提示词，长度=%d，内容预览=%s", len(prompt), prompt[:120])
+        if "可用代理" in prompt or "选择哪些代理" in prompt:
+            return self._plan_route(prompt)
         if "总结观影偏好" in prompt:
             return self._summarize_preferences(prompt)
         if "融合各代理信号" in prompt:
@@ -37,6 +37,11 @@ class LocalRecommenderLLM:
         if "上下文片段" in prompt:
             return self._contextualize(prompt)
         return "I am a local LLM placeholder."
+
+    def _plan_route(self, prompt: str) -> str:
+        if "无需" in prompt:
+            return "preference_agent, retrieval_agent, ranking_agent"
+        return "preference_agent, retrieval_agent, rag_agent, ranking_agent"
 
     def _summarize_preferences(self, prompt: str) -> str:
         if self.canned_preferences:
@@ -77,6 +82,8 @@ def make_llm(preferences: str | None = None) -> LocalRecommenderLLM:
 
     if base_url:
         logger.debug("构建远端LLM，base_url=%s，model=%s", base_url, model)
+        from openai import OpenAI
+
         client = OpenAI(api_key=api_key or "EMPTY", base_url=base_url)
         return RemoteRecommenderLLM(client=client, model=model)
 

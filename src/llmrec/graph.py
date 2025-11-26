@@ -45,6 +45,9 @@ class RecommendationState(TypedDict):
     candidate_pool: List[Movie]
     snippets: List[str]
     recommendations: str
+    pending_agents: List[str]
+    next_agent: str | None
+    route_reason: str
 
 
 def load_catalog(path: str | Path) -> List[Movie]:
@@ -133,21 +136,85 @@ def ranking_agent(llm: LocalRecommenderLLM) -> Callable[[RecommendationState], R
     return _inner
 
 
+def planner_agent(llm: LocalRecommenderLLM) -> Callable[[RecommendationState], RecommendationState]:
+    def _inner(state: RecommendationState) -> RecommendationState:
+        prompt = (
+            "你是调度员，需要根据用户诉求决定调用哪些代理。\n"
+            "可用代理列表：\n"
+            "- preference_agent：总结观影偏好\n"
+            "- retrieval_agent：基于偏好召回影片\n"
+            "- rag_agent：抽取候选影片的剧情片段\n"
+            "- ranking_agent：融合信号生成推荐（必须最后执行）\n"
+            "请输出执行顺序，使用逗号分隔的代理名称列表。如果无需上下文片段可以跳过 rag_agent。\n"
+            f"用户诉求：{state['user_query']}\n"
+            "只返回列表。"
+        )
+        plan = llm.complete(prompt)
+        parsed = [part.strip() for part in plan.split(',') if part.strip()]
+        allowed = [
+            "preference_agent",
+            "retrieval_agent",
+            "rag_agent",
+            "ranking_agent",
+        ]
+        sanitized: List[str] = []
+        for agent in parsed:
+            if agent in allowed and agent not in sanitized:
+                sanitized.append(agent)
+        if not sanitized:
+            sanitized = ["preference_agent", "retrieval_agent", "rag_agent"]
+        if "preference_agent" not in sanitized:
+            sanitized.insert(0, "preference_agent")
+        if "retrieval_agent" not in sanitized:
+            insert_at = sanitized.index("ranking_agent") if "ranking_agent" in sanitized else len(sanitized)
+            sanitized.insert(insert_at, "retrieval_agent")
+        if sanitized[-1] != "ranking_agent":
+            sanitized.append("ranking_agent")
+        logger.debug("规划代理选择的执行序列：%s", sanitized)
+        return {"pending_agents": sanitized, "route_reason": plan}
+
+    return _inner
+
+
+def routing_node(state: RecommendationState) -> RecommendationState:
+    pending = list(state.get("pending_agents", []))
+    if not pending:
+        logger.debug("没有待调度代理，结束工作流")
+        return {"next_agent": None, "pending_agents": []}
+    next_agent = pending.pop(0)
+    logger.debug("路由到代理：%s，剩余队列：%s", next_agent, pending)
+    return {"next_agent": next_agent, "pending_agents": pending}
+
+
 def build_graph(catalog_path: str | Path, llm: LocalRecommenderLLM | None = None):
     llm = llm or make_llm()
     catalog = load_catalog(catalog_path)
 
     workflow = StateGraph(RecommendationState)
+    workflow.add_node("planner_agent", planner_agent(llm))
+    workflow.add_node("routing_node", routing_node)
     workflow.add_node("preference_agent", preference_agent(llm))
     workflow.add_node("retrieval_agent", retrieval_agent(catalog))
     workflow.add_node("rag_agent", rag_agent(catalog))
     workflow.add_node("ranking_agent", ranking_agent(llm))
 
-    workflow.set_entry_point("preference_agent")
-    workflow.add_edge("preference_agent", "retrieval_agent")
-    workflow.add_edge("retrieval_agent", "rag_agent")
-    workflow.add_edge("rag_agent", "ranking_agent")
-    workflow.add_edge("ranking_agent", END)
+    workflow.set_entry_point("planner_agent")
+    workflow.add_edge("planner_agent", "routing_node")
+
+    workflow.add_conditional_edges(
+        "routing_node",
+        lambda state: state["next_agent"] or "END",
+        {
+            "preference_agent": "preference_agent",
+            "retrieval_agent": "retrieval_agent",
+            "rag_agent": "rag_agent",
+            "ranking_agent": "ranking_agent",
+            "END": END,
+        },
+    )
+
+    for agent in ["preference_agent", "retrieval_agent", "rag_agent", "ranking_agent"]:
+        workflow.add_edge(agent, "routing_node")
 
     logger.debug("推荐工作流构建完成")
     return workflow.compile()
@@ -155,5 +222,16 @@ def build_graph(catalog_path: str | Path, llm: LocalRecommenderLLM | None = None
 
 def run_recommendation(user_query: str, catalog_path: str | Path = "data/movies.csv") -> str:
     graph = build_graph(catalog_path)
-    result = graph.invoke({"user_query": user_query, "preferences_summary": "", "candidate_pool": [], "snippets": [], "recommendations": ""})
+    result = graph.invoke(
+        {
+            "user_query": user_query,
+            "preferences_summary": "",
+            "candidate_pool": [],
+            "snippets": [],
+            "recommendations": "",
+            "pending_agents": [],
+            "next_agent": None,
+            "route_reason": "",
+        }
+    )
     return result["recommendations"]
